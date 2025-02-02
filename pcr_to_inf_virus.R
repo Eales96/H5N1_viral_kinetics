@@ -1,6 +1,4 @@
 
-setwd("C:/Users/EALESO/OneDrive - The University of Melbourne/Projects/H5N1 Dairy Cows")
-
 ################################################################################
 ## Load packages
 
