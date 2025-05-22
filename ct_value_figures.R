@@ -133,6 +133,7 @@ mod_fit1 <- readRDS('fit_stan_models/mod_ft_ADC.rds')
 mod_fit2 <- readRDS('fit_stan_models/mod_ft_ADCSD.rds')
 mod_fit3 <- readRDS('fit_stan_models/mod_ft_CDO.rds')
 mod_fit4 <- readRDS('fit_stan_models/mod_ft_NIDO.rds')
+mod_fit5 <- readRDS('fit_stan_models/mod_ft_ADC_adj.rds')
 titre_fit <- readRDS('fit_stan_models/mod_ft_pcr_to_logtitre.rds')
 
 
@@ -143,6 +144,7 @@ post1 <- rstan::extract(mod_fit1)
 post2 <- rstan::extract(mod_fit2)
 post3 <- rstan::extract(mod_fit3)
 post4 <- rstan::extract(mod_fit4)
+post5 <- rstan::extract(mod_fit5)
 
 post6 <- rstan::extract(titre_fit)
 
@@ -593,16 +595,20 @@ sens1 <- get_posteriors(post1,
                         model_name = "All data")
 sens2 <- get_posteriors(post2, 
                         params = c('peak_mn','peak_sd','t_peak_mn','t_peak_sd','decay_mn','decay_sd','decayED_mn','decayED_sd','rise_mn','rise_sd'),
-                        model_name = "Separate decay distributions (challenge data)")
+                        model_name = "Separate decay distributions (experimental infection data)")
 sens3 <- get_posteriors(post3, 
                         params = c('peak_mn','peak_sd','t_peak_mn','t_peak_sd','decay_mn','decay_sd','rise_mn','rise_sd'),
-                        model_name = "Challenge data only")
+                        model_name = "Experimental infection data only")
 sens4 <- get_posteriors(post4, 
                         params = c('decay_mn','decay_sd'),
                         model_name = "Natural infection data only")
+sens5 <- get_posteriors(post5,
+                        params = c('peak_mn','peak_sd','t_peak_mn','t_peak_sd','decay_mn','decay_sd','rise_mn','rise_sd'),
+                        model_name = "Ct value adjusted between experimental infection studies")
+
 
 # Merge data frames ready for plotting
-sens <- rbind(sens1, sens2, sens3, sens4)
+sens <- rbind(sens1, sens2, sens3, sens4, sens5)
 
 # Relabel decay parameter for separate distributions model
 sens[sens$param_name=='decayED_mn',]$model_name <- "Separate decay distributions (natural infection data)"
@@ -635,7 +641,7 @@ ggplot(sens)+
   guides(colour = guide_legend(nrow=3))
 
 # Save figure
-ggsave("Figures/SPlot1.png", width=8, height=8)
+ggsave("Figures/SPlot1.png", width=11, height=8)
 
 
 ############################################################################################################################
