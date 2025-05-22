@@ -93,6 +93,8 @@ stan_model_ADCSD <- stan_model('stan/ct_value_AllDataCombinedSeparateDist.stan')
 stan_model_NIDO <- stan_model('stan/ct_value_NaturalInfectionDataOnly.stan')    # Sensitivity (natural infections only)
 stan_model_CDO <- stan_model('stan/ct_value_ChallengeDataOnly.stan')            # Sensitivity (experimental infections only)
 
+stan_model_ADC_adj <- stan_model('stan/ct_value_AllDataCombinedandCtadj.stan')  # Sensitivity (Ct adjusted between challenge studies)
+
 
 ######################################################################################################################################################
 ## Fitting main model
@@ -214,7 +216,60 @@ mod_fit4 <- sampling(stan_model_NIDO,
 # Saving model output
 saveRDS(mod_fit4, 'fit_stan_models/mod_ft_NIDO.rds')
 
+######################################################################################################################################################
+## Fitting model with adjustment for different laboratory procedure
+# Fitting model to all data combined (5 challenged cows and 12 naturally infected) assuming same decay distribution but different Ct value adjustment between lab procedures
 
+# Formatting data into model interpretable format
+dfC0_1 <- df[df$censored==0 & df$num %in% c(1,2),]
+dfC0_2 <- df[df$censored==0 & df$num %in% c(3,4,5),]
+dfC1 <- df[df$censored==1,]
+dfC2 <- df[df$censored==2,]
+
+dfED <- df3[df3$censored==0,]
+dfEDC<- df3[df3$censored==3,]
+
+mod_data <- list(num_data1 = nrow(dfC0_1),
+                 time1 = dfC0_1$time,
+                 Ct_value1 = dfC0_1$Ct,
+                 cow_number1 = dfC0_1$num,
+                 num_data2 = nrow(dfC0_2),
+                 time2 = dfC0_2$time,
+                 Ct_value2 = dfC0_2$Ct,
+                 cow_number2 = dfC0_2$num,
+                 num_dataC1 = nrow(dfC1),
+                 timeC1 = dfC1$time,
+                 cow_numberC1 = dfC1$num,
+                 num_dataC2 = nrow(dfC2),
+                 timeC2 = dfC2$time,
+                 cow_numberC2 = dfC2$num,
+                 num_cows = 5,
+                 num_dataED = nrow(dfED),
+                 timeED = dfED$time,
+                 Ct_valueED = dfED$Ct,
+                 cow_numberED = as.integer(dfED$num),
+                 num_dataEDC = nrow(dfEDC),
+                 timeEDC = dfEDC$time,
+                 cow_numberEDC = as.integer(dfEDC$num),
+                 num_cowsED = 12)
+
+
+# set seed
+set.seed(123456)
+
+# Fitting the model
+mod_fit5 <- sampling(stan_model_ADC_adj,
+                     iter= 4000,
+                     warmup = 1000,
+                     chains=4,
+                     data = mod_data)
+
+# Saving model output
+saveRDS(mod_fit5, 'fit_stan_models/mod_ft_ADC_adj.rds')
+
+post <- rstan::extract(mod_fit5)
+quantile(post$decay_mn, c(0.5,0.025,0.975))
+quantile(post$ct_adj, c(0.5,0.025,0.975))
 ######################################################################################################################################################
 ## Fitting additional model (not presented in manuscript) - cows experimentally infected with different strain of H5N1
 # Fitting model to cows challenged with different strain (3 challenged cows)
@@ -240,13 +295,13 @@ mod_dataDS <- list(num_data = nrow(df_altC0),
 set.seed(123456)
 
 # Fitting the model
-mod_fit5 <- sampling(stan_model_CDO,
+mod_fit6 <- sampling(stan_model_CDO,
                      iter= 4000,
                      warmup = 1000,
                      chains=4,
                      data = mod_dataDS)
 
 # Saving model output
-saveRDS(mod_fit5, 'fit_stan_models/mod_ft_DS.rds')
+saveRDS(mod_fit6, 'fit_stan_models/mod_ft_DS.rds')
 
 ######################################################################################################################################################
