@@ -10,20 +10,31 @@
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 data {
-  int num_data_x_y;                          // number of data points
-  real<lower=0> logTCID50_x_y[num_data_x_y];
-  real<lower=0, upper=40> Ct_x_y[num_data_x_y];
+  int num_data_x_y1;                          // number of data points
+  real<lower=0> logTCID50_x_y1[num_data_x_y1];
+  real<lower=0, upper=40> Ct_x_y1[num_data_x_y1];
   
-  int num_data_x_ny;                         // number of data points
-  real<lower=0, upper=40> Ct_x_ny[num_data_x_ny];
+  int num_data_x_y2;                          // number of data points
+  real<lower=0> logTCID50_x_y2[num_data_x_y2];
+  real<lower=0, upper=40> Ct_x_y2[num_data_x_y2];
+  
+  int num_data_x_ny1;                         // number of data points
+  real<lower=0, upper=40> Ct_x_ny1[num_data_x_ny1];
+  
+  int num_data_x_ny2;                         // number of data points
+  real<lower=0, upper=40> Ct_x_ny2[num_data_x_ny2];
 }
 
 parameters {
-  vector<lower=0>[num_data_x_y] mod_Ct_x_y;
-  vector<lower=0>[num_data_x_ny] mod_Ct_x_ny;
+  vector<lower=0>[num_data_x_y1] mod_Ct_x_y1;
+  vector<lower=0>[num_data_x_ny1] mod_Ct_x_ny1;
+  
+  vector<lower=0>[num_data_x_y2] mod_Ct_x_y2;
+  vector<lower=0>[num_data_x_ny2] mod_Ct_x_ny2;
   
   //real<lower=0, upper=1.05> logTCID50_x_ny[num_data_x_ny];
-  real<upper=1.05> logTCID50_x_ny[num_data_x_ny];
+  real<upper=1.05> logTCID50_x_ny1[num_data_x_ny1];
+  real<upper=1.0> logTCID50_x_ny2[num_data_x_ny2];
   
   real<lower=0> beta0;
   real<lower=-100, upper=0> beta1;
@@ -35,21 +46,33 @@ parameters {
 
 
 transformed parameters {
-  vector<lower=0>[num_data_x_y] mod_logTCID50_x_y;
-  vector<lower=0>[num_data_x_ny] mod_logTCID50_x_ny;
+  vector<lower=0>[num_data_x_y1] mod_logTCID50_x_y1;
+  vector<lower=0>[num_data_x_ny1] mod_logTCID50_x_ny1;
   
-  mod_logTCID50_x_y = beta0 / (1 + exp(beta1*(beta2-mod_Ct_x_y) ) );
-  mod_logTCID50_x_ny = beta0 / (1 + exp(beta1*(beta2-mod_Ct_x_ny) ) );
+  vector<lower=0>[num_data_x_y2] mod_logTCID50_x_y2;
+  vector<lower=0>[num_data_x_ny2] mod_logTCID50_x_ny2;
+  
+  mod_logTCID50_x_y1 = beta0 / (1 + exp(beta1*(beta2-mod_Ct_x_y1) ) );
+  mod_logTCID50_x_ny1 = beta0 / (1 + exp(beta1*(beta2-mod_Ct_x_ny1) ) );
+  
+  mod_logTCID50_x_y2 = beta0 / (1 + exp(beta1*(beta2-mod_Ct_x_y2) ) );
+  mod_logTCID50_x_ny2 = beta0 / (1 + exp(beta1*(beta2-mod_Ct_x_ny2) ) );
   
   
 
 }
 
 model {
-  logTCID50_x_y ~ normal(mod_logTCID50_x_y, sigma_logTCID50);
-  logTCID50_x_ny ~ normal(mod_logTCID50_x_ny, sigma_logTCID50);
+  logTCID50_x_y1 ~ normal(mod_logTCID50_x_y1, sigma_logTCID50);
+  logTCID50_x_ny1 ~ normal(mod_logTCID50_x_ny1, sigma_logTCID50);
   
-  Ct_x_y ~ normal(mod_Ct_x_y, sigma_Ct);
-  Ct_x_ny ~ normal(mod_Ct_x_ny, sigma_Ct);
+  logTCID50_x_y2 ~ normal(mod_logTCID50_x_y2, sigma_logTCID50);
+  logTCID50_x_ny2 ~ normal(mod_logTCID50_x_ny2, sigma_logTCID50);
+  
+  Ct_x_y1 ~ normal(mod_Ct_x_y1, sigma_Ct);
+  Ct_x_ny1 ~ normal(mod_Ct_x_ny1, sigma_Ct);
+  
+  Ct_x_y2 ~ normal(mod_Ct_x_y2, sigma_Ct);
+  Ct_x_ny2 ~ normal(mod_Ct_x_ny2, sigma_Ct);
 
 }
