@@ -13,6 +13,10 @@ data {
   real<lower=0> timeC2[num_dataC2];
   int<lower=0> cow_numberC2[num_dataC2];
   
+  int num_dataC4;                          // number of data points
+  real<lower=0> timeC4[num_dataC4];
+  int<lower=0> cow_numberC4[num_dataC4];
+  
   int num_cows;
   
 }
@@ -22,6 +26,7 @@ parameters {
   // censored data
   real<lower=40> Ct_valueC1[num_dataC1];
   real<lower=38> Ct_valueC2[num_dataC2];
+  real<lower=36.84842> Ct_valueC4[num_dataC4];
   
   
   // model parameters
@@ -78,12 +83,23 @@ transformed parameters{
       mod_CtC2[i] = peak_i[cow_numberC2[i]] + (timeC2[i]-t_peak_i[cow_numberC2[i]])*decay_i[cow_numberC2[i]];
     }
   }
+  
+  vector<lower=0>[num_dataC4] mod_CtC4;
+  
+  for( i in 1:num_dataC4){
+    if(timeC4[i]<t_peak_i[cow_numberC4[i]] ){
+      mod_CtC4[i] = peak_i[cow_numberC4[i]] - (timeC4[i]-t_peak_i[cow_numberC4[i]])*rise_i[cow_numberC4[i]];
+    } else{
+      mod_CtC4[i] = peak_i[cow_numberC4[i]] + (timeC4[i]-t_peak_i[cow_numberC4[i]])*decay_i[cow_numberC4[i]];
+    }
+  }
 }
 
 model {
   Ct_value ~ normal(  mod_Ct   , sigma_Ct);
   Ct_valueC1 ~ normal(  mod_CtC1   , sigma_Ct);
   Ct_valueC2 ~ normal(  mod_CtC2   , sigma_Ct);
+  Ct_valueC4 ~ normal(  mod_CtC4   , sigma_Ct);
   
   t_peak_i ~ normal(t_peak_mn, t_peak_sd);
   peak_i ~ normal(peak_mn, peak_sd);
