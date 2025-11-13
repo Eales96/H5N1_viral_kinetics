@@ -1,4 +1,6 @@
 
+setwd("C:/Users/EALESO/OneDrive - The University of Melbourne/Projects/H5N1 Dairy Cows/Revisions")
+
 ################################################################################
 ## Load packages and functions
 
@@ -28,38 +30,79 @@ Cas2b <- read.csv('data/Caserta_Fig2b.csv') # Caserta et al 2024
 Cas1a <- read.csv('data/Caserta_Fig1a.csv') # Caserta et al 2024
 Cas1f <- read.csv('data/Caserta_Fig1f.csv') # Caserta et al 2024
 
+Fac4bd <- read.csv('data/Facciuolo4bd.csv')
+Fac4ce <- read.csv('data/Facciuolo4ce.csv')
+
+
+###############################################################################################
+## Preparing the core data sets from the cow challenge studies (experimentally infected cows)
 
 ################################################################################
-## Preparing the core datasets from the cow challenge studies
+## Baker et al 
 
-# We will only use the samples collected from milk bucket from Baker et al
+# We will only use the samples collected from milk bucket from Baker et al 2024
 df1 <- df1[df1$Sample=="Milk Bucket",]
 df1 <- df1[c(1,2,4)]
 colnames(df1) <- c("ID", "time", "Ct")
 
-
+################################################################################
+## Halwe et al 
 # Rounding 'time' column for data from Halwe et al (data was extracted manually from plot using plotdigitize)
 df2$x <- round(df2$x)
 colnames(df2) <- c("time", "Ct", "ID")
 
+################################################################################
+## Facciuolo et al
+
+# Data is provided as TCID50ml-1 for milk samples from each teat
+# Average across milk samples do get TCID50ml-1 for combined milk sample
+Fac4bd$avg_tcid <- (Fac4bd$HL+Fac4bd$FL+Fac4bd$HR+Fac4bd$FR) / 4
+
+# Use standard curve to obtain Ct value
+Fac4bd$Ct <- -1.736*log(Fac4bd$avg_tcid) + 44.843
+
+# Limit of detection was assumed to be 100 TCID50ml-1 so can 
+# infer limit of detection for CT value
+lod4 <- -1.736*log(100) + 44.843
+
+
+Fac4bd_alt <- Fac4bd[colnames(Fac4bd)%in% c("COW_ID","DPI","Ct")]
+colnames(Fac4bd_alt)<- c("ID","time","Ct")
+
+################################################################################
+# Combining all data from experimentally infected cattle
 
 # Labelling data that was censored
 df1$censored <- 0
 df1[df1$Ct==40,]$censored <- 1
 df2$censored <- 0
 df2[df2$Ct==38,]$censored <- 2
+Fac4bd_alt$censored <- 0
+Fac4bd_alt[Fac4bd_alt$Ct>lod4,]$censored <- 4
+
 
 # Combing the core datasets (df1 and df2)
-df <- rbind(df1, df2[df2$ID %in% c("Halwe1","Halwe2","Halwe3"),])
-df_alt <- df2[df2$ID %in% c("Halwe4","Halwe5","Halwe6"),]
+df <- rbind(df1, df2[df2$ID %in% c("Halwe1","Halwe2","Halwe3"),], Fac4bd_alt)
 
-# Labelling individual cows in format
+# Labelling individual cows in format 1,2,3,4,5 (for model input later)
 df$num <- 0
 df[df$ID%in%2112,]$num <- 1
 df[df$ID%in%2129,]$num <- 2
 df[df$ID%in%"Halwe1",]$num <- 3
 df[df$ID%in%"Halwe2",]$num <- 4
 df[df$ID%in%"Halwe3",]$num <- 5
+df[df$ID%in%4,]$num <- 6
+df[df$ID%in%11,]$num <- 7
+
+# Additional longitudinal data was also available from Halwe et al !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# However, the cows were challenged with a different strain of H5N1 and so 
+#   we do not include them in any analysis presented in our paper
+# We include code for analysing this additional data in isolation as an example
+df_alt <- df2[df2$ID %in% c("Halwe4","Halwe5","Halwe6"),]
+df_alt$num <- 0
+df_alt[df_alt$ID%in%"Halwe4",]$num <- 1
+df_alt[df_alt$ID%in%"Halwe5",]$num <- 2
+df_alt[df_alt$ID%in%"Halwe6",]$num <- 3
 
 
 ################################################################################
@@ -86,6 +129,24 @@ df3$Ct = 45-as.numeric(df3$Ct)
 df3$censored <- 0.0
 df3[df3$Ct==45,]$censored <- 3
 
+################################################################################
+# Preparing data from additonal Ct to log-titre study
+Fac4ce$avg_tcid <- (Fac4ce$HL+Fac4ce$FL+Fac4ce$HR+Fac4ce$FR) / 4
+Fac4ce$log_tcid <- log10(Fac4ce$avg_tcid)
+
+ 
+
+df5 <- data.frame()
+for(i in 1:nrow(Fac4ce)){
+  
+  temp_df <- Fac4bd[Fac4bd$COW_ID==Fac4ce$COW_ID[i] &Fac4bd$DPI==Fac4ce$DAY[i],]
+  
+  new_row <- data.frame(COW_ID=temp_df$COW_ID,
+                        DPI = temp_df$DPI,
+                        Ct = temp_df$Ct,
+                        logTCID50 = Fac4ce$log_tcid[i])
+  df5 <- rbind(df5, new_row)
+}
 
 ################################################################################
 ## Preparing the data from the natural infection Ct-value to Infectious Log-Titre
@@ -120,6 +181,8 @@ df4[df4$logTCID50<1.05,]$censored <- 1
 
 df4$logTCID50_new <- df4$logTCID50
 df4[df4$logTCID50<1.05,]$logTCID50_new <- 1.05
+
+
 
 
 ############################################################################################################################
@@ -218,19 +281,24 @@ df_modi2 <- get_posteriorH_all_i(post1, index=2, time=seq(0,30,1))
 df_modi3 <- get_posteriorH_all_i(post1, index=3, time=seq(0,30,1))
 df_modi4 <- get_posteriorH_all_i(post1, index=4, time=seq(0,30,1))
 df_modi5 <- get_posteriorH_all_i(post1, index=5, time=seq(0,30,1))
+df_modi6 <- get_posteriorH_all_i(post1, index=6, time=seq(0,30,1))
+df_modi7 <- get_posteriorH_all_i(post1, index=7, time=seq(0,30,1))
 
 # Merge into single data frame
 df_modi <- rbind(df_modi1,
                  df_modi2,
                  df_modi3,
                  df_modi4,
-                 df_modi5)
+                 df_modi5,
+                 df_modi6,
+                 df_modi7)
 
 # Factor index of individual for model and data (df)
 df_modi$index <- factor(df_modi$index)
 df$index <- factor(df$ID)
-df$index <- factor(df$index, labels= c(1,2,3,4,5))
+df$index <- factor(df$num)
 
+df[df$censored==4,]$Ct <- lod4
 # Plot pabel
 plt1b<-ggplot(df_modi)+
   geom_line(aes(x=time, y=y, colour=index))+
@@ -241,13 +309,13 @@ plt1b<-ggplot(df_modi)+
   geom_errorbar(data=df[df$censored!=0,], aes(ymin=Ct, ymax=50, x= time, colour=index ), linetype="dashed", width=0)+
   geom_errorbar(data=df[df$censored!=0,], aes(ymin=Ct, ymax=Ct, x= time, colour=index ), size=1, width=2)+
   theme_bw(base_size=14)+
-  facet_wrap(.~index, nrow=1)+
+  facet_wrap(.~index, nrow=2)+
   ylab("Ct value")+
   xlab("Days post innoculation")+
   scale_y_reverse()+
   scale_color_brewer(palette = "Dark2")+
   scale_fill_brewer(palette = "Dark2")+
-  coord_cartesian(ylim=c(40,10), xlim=c(0,25))+
+  coord_cartesian(ylim=c(40,10), xlim=c(0,29))+
   theme(legend.position = "none",
         panel.grid = element_blank(),
         strip.background = element_blank(),
@@ -270,8 +338,10 @@ plt1b <- plt1b+
   theme(plot.title = element_text(hjust = 0.5),
         plot.tag.position= c(0,0.97))
 
-plt1b + plt1a + plot_layout(nrow=2)
-ggsave("Figures/Plot1.png", width=12, height=10)
+plt1b + plt1a + plot_layout(nrow=2, heights=c(1.5,1))
+ggsave("Figures/Plot1.png", width=10, height=10)
+ggsave("Figures/Plot1.tiff", width=10, height=10)
+
 
 
 ############################################################################################################################
@@ -294,10 +364,10 @@ plt2a<-ggplot(df_mod1)+
   geom_line(aes(x=time, y=y))+
   geom_ribbon(aes(x=time, ymin=y_lb95,ymax=y_ub95), alpha=0.2)+
   geom_ribbon(aes(x=time, ymin=y_lb50,ymax=y_ub50), alpha=0.2)+
-  geom_point(data=df[df$censored==0,], aes(y=Ct, x= time+(3-num)*0.2, colour=factor(ID), shape=factor(censored!=0) ), size=5)+
-  geom_line(data=df, aes(y=Ct, x= time+(3-num)*0.2, colour=factor(ID) )) +
-  geom_errorbar(data=df[df$censored!=0,], aes(ymin=Ct, ymax=50, x= time+(3-num)*0.2, colour=factor(ID) ), linetype="dashed", width=0)+
-  geom_errorbar(data=df[df$censored!=0,], aes(ymin= Ct , ymax=Ct, x= time+(3-num)*0.2, colour=factor(ID)),size=2, width=0.5)+
+  geom_point(data=df[df$censored==0,], aes(y=Ct, x= time+(4-num)*0.1, colour=factor(num), shape=factor(censored!=0) ), size=5)+
+  geom_line(data=df, aes(y=Ct, x= time+(4-num)*0.1, colour=factor(num) )) +
+  geom_errorbar(data=df[df$censored!=0,], aes(ymin=Ct, ymax=50, x= time+(4-num)*0.1, colour=factor(num) ), linetype="dashed", width=0)+
+  geom_errorbar(data=df[df$censored!=0,], aes(ymin= Ct , ymax=Ct, x= time+(4-num)*0.1, colour=factor(num)),size=2, width=0.5)+
   #geom_hline(yintercept = quan[[1]], color='red', linetype="dashed")+
   #geom_hline(yintercept = quan[[2]], color='red', linetype="solid")+
   #geom_hline(yintercept = quan[[3]], color='red', linetype="dashed")+
@@ -311,7 +381,7 @@ plt2a<-ggplot(df_mod1)+
   scale_y_reverse()+
   scale_shape_manual(values = c(20,95))+
   scale_color_brewer(palette = "Dark2")+
-  coord_cartesian(ylim=c(40,10), xlim=c(0,25))+
+  coord_cartesian(ylim=c(40,10), xlim=c(0,28))+
   theme(legend.position = "none",
         panel.grid = element_blank())
 
@@ -320,26 +390,37 @@ plt2a<-ggplot(df_mod1)+
 ## Panel B
 
 # Get model output posterior distribution of Ct-value to log-titre of infectious virus model
-df_mod6 <- inf_virus_posterior(post6, Ct=seq(0,30,0.1))
+df_mod6 <- inf_virus_posterior(post6, Ct=seq(0,45,0.1))
 
+df5$censored <- 0
+df5[df5$logTCID50<1,]$censored <-1
+df5[df5$logTCID50<1,]$logTCID50 <- 1
+df5 <- df5[df5$DPI>0,]
 # Plot panel
+colsLog <- RColorBrewer::brewer.pal(7,"Dark2")[6:7]
+
 plt2b<-ggplot(df_mod6)+
   geom_line(aes(x=Ct, y=y))+
   geom_ribbon(aes(x=Ct, ymin=y_lb95,ymax=y_ub95), alpha=0.2)+
   geom_ribbon(aes(x=Ct, ymin=y_lb50,ymax=y_ub50), alpha=0.2)+
-  geom_point(data=df4[df4$censored==0,], aes(y=logTCID50_new, x= Ct, shape=factor(censored) ), size=5)+
+  geom_point(data=df4[df4$censored==0,], aes(y=logTCID50_new, x= Ct, shape=factor(censored) ), size=4)+
   geom_errorbar(data=df4[df4$censored==1,], aes(ymax=logTCID50_new, ymin=0.0, x= Ct ), linetype="dashed", width=0)+
   geom_errorbar(data=df4[df4$censored==1,], aes(ymax=logTCID50_new, ymin=logTCID50_new, x= Ct ),size=2)+
+  geom_point(data=df5[df5$censored==0,], aes(y=logTCID50, x= Ct, shape=factor(censored), color=factor(COW_ID) ), size=4)+
+  geom_path(data=df5, aes(y=logTCID50, x= Ct, group=COW_ID, color=factor(COW_ID) ), size=0.1)+
+  geom_errorbar(data=df5[df5$censored==1,], aes(ymax=logTCID50, ymin=0.0, x= Ct, color=factor(COW_ID)), linetype="dashed", width=0)+
+  geom_errorbar(data=df5[df5$censored==1,], aes(ymax=logTCID50, ymin=logTCID50, x= Ct, color=factor(COW_ID) ),size=2)+
   geom_vline(xintercept = quan[[1]], color='red', linetype="dashed")+
   geom_vline(xintercept = quan[[2]], color='red', linetype="solid")+
   geom_vline(xintercept = quan[[3]], color='red', linetype="dashed")+
   ylab("LogTCID50")+
   xlab("Ct value")+
+  scale_color_manual(values = colsLog)+
   scale_shape_manual(values = c(20,95))+
   theme_bw(base_size = 14)+
   theme(legend.position = "none")+
-  coord_cartesian(xlim=c(10,30))
-
+  coord_cartesian(xlim=c(10,33))
+plt2b
 
 ################################################################################
 ## Panel C
@@ -383,6 +464,8 @@ plt2c<-plt2c + labs(tag="C")
 
 plt2a + plt2b + plt2c + plot_layout(nrow=1)
 ggsave("Figures/Plot2.png", width=14, height=6)
+ggsave("Figures/Plot2.tiff", width=14, height=6)
+
 
 
 ################################################################################################################
@@ -397,13 +480,15 @@ N_vals <- c(1,seq(10,40000,10))
 # Efficiency of rt-PCR test used
 efficiency <- c(1.0, 0.95, 0.9)
 
+milk_prod <- c(1.0, 0.5, 0.25, 0.1)
+
 # Get all combinations of parameters to use
-df_milk <- expand.grid(Ct_vals, N_vals, efficiency)
-colnames(df_milk) <- c("base", "N", "eff")
+df_milk <- expand.grid(Ct_vals, N_vals, efficiency, milk_prod)
+colnames(df_milk) <- c("base", "N", "eff","m")
 
 
 # Calculate the Ct value of the pooled sample
-df_milk$Ct <- df_milk$base+log(df_milk$N, base=1+df_milk$eff)
+df_milk$Ct <- df_milk$base+log(1+(df_milk$N-1)/df_milk$m, base=1+df_milk$eff)
 
 cols <- rev(RColorBrewer::brewer.pal(10,"Spectral"))
 
@@ -411,12 +496,16 @@ cols <- rev(RColorBrewer::brewer.pal(10,"Spectral"))
 quan1<-quantile(rnorm(100000, median(post1$peak_mn), median(post1$peak_sd)), c(0.025,0.5,0.975))
 quan2<-quantile(post1$peak_mn, c(0.025,0.5,0.975))
 
+# add in a row to fix colour scale issue later
+df_milk_new <- data.frame(base=5, N=1, eff=1,m=0.1, Ct = 5 + log(1 + (1-1)/0.1, base=2) )
+df_milk <- rbind(df_milk, df_milk_new)
+
 # Re factor the variable describing rt-PCR amplification efficiency
 df_milk$eff <- factor(df_milk$eff)
 levels(df_milk$eff) <- c("90% efficiency", "95% efficiency", "100% efficiency")
 
 # Plot the figure
-plot4<-ggplot(df_milk, aes(x=N, y=base, z = Ct, fill = Ct))+
+plot4<-ggplot(df_milk[df_milk$m==1,], aes(x=N, y=base, z = Ct, fill = Ct))+
   geom_tile(width=100.)+
   facet_wrap(.~eff)+
   ylab("Ct value of infected animal")+
@@ -442,7 +531,133 @@ plot4<-ggplot(df_milk, aes(x=N, y=base, z = Ct, fill = Ct))+
 
 # Save the figure
 ggsave("Figures/Plot3.png", width=8, height=6)
+ggsave("Figures/Plot3.tiff", width=8, height=6)
 
+
+
+
+plot4_sens_A<-ggplot(df_milk[df_milk$m==1,], aes(x=N, y=base, z = Ct, fill = Ct))+
+  geom_tile(width=100.)+
+  facet_wrap(.~eff)+
+  ylab("Ct value of infected animal")+
+  xlab("Number of cattle")+
+  scale_fill_stepsn("Ct value of\npooled milk sample ",
+                    colours = cols,
+                    breaks = seq(10,40),
+                    labels=c("10",rep("",29),"40+"))+
+  geom_contour(breaks =seq(25,45,5), colour="black", position = "jitter")+
+  geom_text_contour(breaks =seq(25,40,2.5), stroke=0.2, label.placement = label_placement_fraction(0.25))+
+  theme_bw(base_size = 14)+
+  geom_hline(yintercept = quan1[[1]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan1[[3]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[2]], color="cyan" )+
+  geom_hline(yintercept = quan2[[1]], color="cyan", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[3]], color="cyan", linetype="dashed" )+
+  scale_x_continuous(breaks=c(1,10000, 20000,30000,40000))+
+  theme(strip.background = element_rect(fill = "white"),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = "bottom")+
+  coord_cartesian(xlim=c(230,38000), ylim=c(10,25))
+
+plot4_sens_B<-ggplot(df_milk[df_milk$m==0.5,], aes(x=N, y=base, z = Ct, fill = Ct))+
+  geom_tile(width=100.)+
+  facet_wrap(.~eff)+
+  ylab("Ct value of infected animal")+
+  xlab("Number of cattle")+
+  scale_fill_stepsn("Ct value of\npooled milk sample ",
+                    colours = cols,
+                    breaks = seq(10,40),
+                    labels=c("10",rep("",29),"40+"))+
+  geom_contour(breaks =seq(25,45,5), colour="black", position = "jitter")+
+  geom_text_contour(breaks =seq(25,40,2.5), stroke=0.2, label.placement = label_placement_fraction(0.25))+
+  theme_bw(base_size = 14)+
+  geom_hline(yintercept = quan1[[1]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan1[[3]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[2]], color="cyan" )+
+  geom_hline(yintercept = quan2[[1]], color="cyan", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[3]], color="cyan", linetype="dashed" )+
+  scale_x_continuous(breaks=c(1,10000, 20000,30000,40000))+
+  theme(strip.background = element_rect(fill = "white"),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = "bottom")+
+  coord_cartesian(xlim=c(230,38000), ylim=c(10,25))
+
+plot4_sens_C<-ggplot(df_milk[df_milk$m==0.25,], aes(x=N, y=base, z = Ct, fill = Ct))+
+  geom_tile(width=100.)+
+  facet_wrap(.~eff)+
+  ylab("Ct value of infected animal")+
+  xlab("Number of cattle")+
+  scale_fill_stepsn("Ct value of\npooled milk sample ",
+                    colours = cols,
+                    breaks = seq(10,40),
+                    labels=c("10",rep("",29),"40+"))+
+  geom_contour(breaks =seq(25,45,5), colour="black", position = "jitter")+
+  geom_text_contour(breaks =seq(25,40,2.5), stroke=0.2, label.placement = label_placement_fraction(0.25))+
+  theme_bw(base_size = 14)+
+  geom_hline(yintercept = quan1[[1]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan1[[3]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[2]], color="cyan" )+
+  geom_hline(yintercept = quan2[[1]], color="cyan", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[3]], color="cyan", linetype="dashed" )+
+  scale_x_continuous(breaks=c(1,10000, 20000,30000,40000))+
+  theme(strip.background = element_rect(fill = "white"),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = "bottom")+
+  coord_cartesian(xlim=c(230,38000), ylim=c(10,25))
+
+
+
+plot4_sens_D<-ggplot(df_milk[df_milk$m==0.1,], aes(x=N, y=base, z = Ct, fill=Ct))+
+  geom_tile(width=100.)+
+  facet_wrap(.~eff)+
+  ylab("Ct value of infected animal")+
+  xlab("Number of cattle")+
+  scale_fill_stepsn("Ct value of\npooled milk sample ",
+                    colours = cols,
+                    breaks = seq(10,40),
+                    labels=c("10",rep("",29),"40+"))+
+  geom_contour(breaks =seq(25,45,5), colour="black", position = "jitter")+
+  geom_text_contour(breaks =seq(25,40,2.5), stroke=0.2, label.placement = label_placement_fraction(0.25))+
+  theme_bw(base_size = 14)+
+  geom_hline(yintercept = quan1[[1]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan1[[3]], color="blue", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[2]], color="cyan" )+
+  geom_hline(yintercept = quan2[[1]], color="cyan", linetype="dashed" )+
+  geom_hline(yintercept = quan2[[3]], color="cyan", linetype="dashed" )+
+  scale_x_continuous(breaks=c(1,10000, 20000,30000,40000))+
+  theme(strip.background = element_rect(fill = "white"),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        legend.position = "bottom")+
+  coord_cartesian(xlim=c(230,38000), ylim=c(10,25))
+
+plot4_sens_A <- plot4_sens_A+
+  ggtitle("100% milk production in infected animal")+
+  theme(legend.position = "none",
+        plot.title = element_text(size = 16, hjust=0.5))
+  
+
+plot4_sens_B <- plot4_sens_B+
+  ggtitle("50% milk production in infected animal")+
+  theme(legend.position = "none",
+        plot.title = element_text(size = 16, hjust=0.5))
+
+plot4_sens_C <- plot4_sens_C+
+  ggtitle("25% milk production in infected animal")+
+  theme(legend.position = "none",
+        plot.title = element_text(size = 16, hjust=0.5))
+
+plot4_sens_D <- plot4_sens_D+
+  ggtitle("10% milk production in infected animal")+
+  theme(legend.position="none", 
+        plot.title = element_text(size = 16, hjust=0.5))
+
+plot4_sens <- plot4_sens_A + plot4_sens_B + plot4_sens_C +plot4_sens_D+plot_layout(nrow=2)
+ggsave("Figures/Plot3_sens.png", width=14, height=10)
+ggsave("Figures/Plot3_sens.tiff", width=14, height=10)
 
 ############################################################################################################################
 # Main figure 4
@@ -534,6 +749,7 @@ ggplot(df_sensF, aes(x=t_isol, y=prop_isol, z = y, fill = y))+
 
 # Save figure
 ggsave("Figures/Plot4.png", width=10, height=6)
+ggsave("Figures/Plot4.tiff", width=10, height=6)
 
 
 
@@ -583,6 +799,7 @@ eci_A <- eci_A +labs(tag="B")
 
 eci_B +eci_A
 ggsave("Figures/SPlot4.png", width=10, height=6)
+ggsave("Figures/SPlot4.tiff", width=10, height=6)
 
 #########################################################################################################################
 # Supplementary Figure 1
@@ -604,8 +821,7 @@ sens4 <- get_posteriors(post4,
                         model_name = "Natural infection data only")
 sens5 <- get_posteriors(post5,
                         params = c('peak_mn','peak_sd','t_peak_mn','t_peak_sd','decay_mn','decay_sd','rise_mn','rise_sd'),
-                        model_name = "Ct value adjusted between experimental infection studies")
-
+                        model_name = "Ct value adjusted between all experimental infection studies")
 
 # Merge data frames ready for plotting
 sens <- rbind(sens1, sens2, sens3, sens4, sens5)
@@ -642,6 +858,7 @@ ggplot(sens)+
 
 # Save figure
 ggsave("Figures/SPlot1.png", width=11, height=8)
+ggsave("Figures/SPlot1.tiff", width=11, height=8)
 
 
 ############################################################################################################################
@@ -702,7 +919,7 @@ ggplot(df_test[df_test$t_inf<20,], aes(x = t_inf, y=Threshold, fill=Threshold ))
 
 # Save figure
 ggsave("Figures/SPlot2.png", width=8, height=8)
-
+ggsave("Figures/SPlot2.tiff", width=8, height=8)
 
 ###########################################################################################################################################
 # Supplementary Figure 3
@@ -791,6 +1008,7 @@ posterior_plot <- panel1a + panel1b + panel1c + panel1d + panel1e + panel1f + pa
   plot_layout(nrow = 7)
 
 ggsave("Figures/SPlot3.png", width=8, height=10)
+ggsave("Figures/SPlot3.tiff", width=8, height=10)
 
 
 ###########################################################################################################################################
@@ -814,7 +1032,7 @@ quantile(post1$decay_mn, c(0.025,0.5,0.975))
 ## Section: 'Pooled testing of milk vats'
 
 # Expected Ct value for a pooled sample of 40,000 cows in which  a single infected cow has an expected Ct of 17.0
-df_milk[df_milk$base==16.9 & df_milk$N==40000,]
+df_milk[df_milk$base==15.7 & df_milk$N==40000,]
 
 
 ################################################################################
@@ -866,3 +1084,9 @@ quantile(vals1, c(0.025,0.5, 0.975))
 
 # Proportion of transmsision prevented isolating all infections at 7 days post infection
 df_sens[df_sens$t_isol==7.0 & df_sens$prop_isol==1.0,]
+
+
+
+################################################################################
+## Ct-adjustment for Supplementary figure 1 caption
+quantile(post5$ct_adj, c(0.5,0.025,0.975))
