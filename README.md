@@ -8,4 +8,4 @@ All statistical models can be run using the scripts 'ct_value_model.R' and 'pcr_
 
 
 ## Data
-The data required to run the analysis is available in the 'data' subdirectory. The data has been obtained from [Halwe et.al 2024](https://www.nature.com/articles/s41586-024-08063-y), [Caserta et.al. 2024](https://www.nature.com/articles/s41586-024-07849-4), and [Baker et.al. 2024](https://www.nature.com/articles/s41586-024-08166-6)
+The data required to run the analysis is available in the 'data' subdirectory. The data has been obtained from [Halwe et.al 2024](https://www.nature.com/articles/s41586-024-08063-y), [Caserta et.al. 2024](https://www.nature.com/articles/s41586-024-07849-4), [Baker et.al. 2024](https://www.nature.com/articles/s41586-024-08166-6), and [Facciuolo et al. 2025](https://www.nature.com/articles/s41564-025-01998-6)
